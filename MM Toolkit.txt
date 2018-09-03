@@ -1,0 +1,109 @@
+/*
+Market Maker toolkit based on Steve Mauro plan
+Risk is 2%
+Stop set 23 pips above high if first leg
+Stop set 10 pips above high if second leg
+If trailing, trail by 32 pips, otherwise hard SL and TP always set, TP = 50 pips
+
+Some Rules:
+0000-0800 Asian range less than 50 pips otherwise watch the last 1/3
+0930-1600 London
+1630-2400 NY
+Traps occur beginning of week, day, and session, and the end of each as well
+A trap is a pull away from the recent high/low to "trap" the traders who expect continuation
+Gap times are the 30 mins before the opens, there are only 2 - 0300-0400 and 0900-1000 EST
+ADR 200 for a day 600 for a week max
+Look for ADR * 3 once the move begins
+MA's: 5 13 50 200 800 mustard ketchup water mayo blueberry
+Previous Day High/Low show on current
+4HR chart HOW and LOW during first 8 hours
+Out of asian range, watch for vector in opposite of main trend
+Use shift bar to confirm
+W V V M for uptrends
+M A A W for downtrends
+Pivots: (M's are halfway between pivots: S2 M1 S1 M2 CPP M3 R1 M4 R2)
+M2 up to M4 is the up day
+M3 down to M1 is the down day
+Level 1 begins off of an M or W - MA's tighen
+Level 2 extends, Market makers ignore and come back for level 3 - 50 MA crosses 200
+Level 3 ends with a W or M and Head/Shoulders - MA's fan out
+Gap/brinks trade occurs when the HOD or LOD is set during gap time
+Safety trade is after level 1 consolidation
+WAIT FOR TRADES AFTER THE SESSION BEGINS TO AVOID TRAP MOVES
+
+TDI:
+RSI 21
+Outside volatiliy band VB
+cross the middle band MB
+cross VB again
+come back into VB to close, or move stop tight
+
+First line on the tool will be the "Big Board" 
+Bid Ask High Low Spread (High and Lows are for the current day)
+Gap Times
+ADR
+
+
+*/
+
+/*
+Checklist -
+Pivot points
+Boxes drawn and width put in
+	boxes need a time for beginning and end, then a price for the top and bottom
+		find price with highest/lowest functions, check the box when those are broken
+	boxes needed are: 
+		asian range
+			stop hunt zones above and below asian range
+				25 pips above/below, 50 pips away from start
+		London gap time
+		NY gap time
+		
+ADR = high - low indicator for daily and weekly bars
+	
+Estimate current day range with LOD/HOD and ADR
+new menus? remake old ones?
+
+
+*/
+
+/*
+Pivots
+
+	double pivot=(high[1]+close[1]+low[1])/3;
+	double r1 = (2 * pivot) - low[1];
+	double m3 = (pivot + r1) / 2;
+	double s1 = (2 * pivot) - high[1];
+	double m2 = (pivot + s1) / 2;
+	double r2 = pivot + (r1 - s1);
+	double m4 = (r2 + r1) / 2;
+	double s2 = pivot - (r1 - s1);
+	double m1 = (s2 + s1) / 2;
+	double r3 = high[1] + (2* (pivot - low[1]));
+	double s3 = low[1] - (2*(high[1] - pivot));
+*/
+
+/*	Position planning and management
+Entry: rules for entering
+	Determine level (1,2,3) and direction (up/down)
+		MA spread helps with levels, 50 over 200 might mean level 2
+	Find PFH or PFL and trade away from it (M or W of day or week)
+	Look to counter traps in gap time (brinks trade when it is HOD or LOD)
+	
+Holding: rules while position is open
+	Monitor ADR for week and day to determine range of the trade
+	M2 to M4 pivots for up days (M3 to M1 for down)	
+	
+Exit: signs to close early, monitored while holding
+	50 pips reached, or stop loss of 23 pips on single leg and 10 pips on double 
+	(if trailing, move stops to break even at 32 pips)
+	
+
+How does homework play into these rules? The boxes still must be monitored, PFH and PFL as well
+
+*/
+
+/*
+FXCM Directional Real Volume indicator, also FXCM is largest US broker as of Aug 2016 
+- now they cannot broker as of 2/6/17
+*/

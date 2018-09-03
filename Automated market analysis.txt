@@ -1,0 +1,894 @@
+NEXT GOAL
+/*
+Combine all knowledge into a system that notifies of all possible signals and combines them into a 
+cross verification system. Triple screen and impusle system are implemented but other measures would 
+have to be added. Maybe add the change to force index that counts when it crosses 0 to indicate a signal 
+showing that the dip has been completed. Impulse still looks for green in two lower timeframes.
+CV List:
+-Momentum indicator/Trend (MACD part of triple screen, cannot program MAR, ROC)
+-Oscillator/short range (RSI, Stochastics, force not needed since it is used in triple screen)
+-Volume (Histogram bars, ADX, OBV)
+Fib levels (cannot be done constantly over short term, individual analysis needed for each trade)
+-maybe- Candlestick pattern (may be possible for the simple patterns which sometimes are the strongest)
+-maybe- Trendlines (might need manual, but LA little defines trend with swing points)
+-maybe- S/R levels (these can be derived from LA Little swing points)
+-Bollinger bands (or other volitillity tracking like ATR, check notes for BB rules)
+Patterns (The 7 bells, Oneal patterns, cannot program, too complex)
+
+Add in swing levels and arrows to show, using LA little analysis
+(keep track of highest highs with volume and lowest lows with volume over 6 bars)
+*/
+
+SwingPoints complete
+
+
+
+
+//find highest price
+double Highest(int pb)  //say pb = 6 for now, means how many bars back to look
+{
+input int PastBars = pb;  // Number of past bars to find highest bar.
+double BarHigh = 0;       // Highest bar value from PastBars range.
+
+MqlRates rates[];
+ArraySetAsSeries(rates,true);
+double copied=0;
+copied=CopyRates(Symbol(),0,0,PastBars,rates);
+   
+if(copied>0)
+  {
+    double size=fmin(copied,PastBars);
+    for(int i=0;i<size;i++)
+      {
+         If(rates[i].high > BarHigh) BarHigh=rates[i].high;
+      }
+  }
+return BarHigh;
+}
+//lowest
+double Lowest(int pb)  //say pb = 5 for now, means how many bars back to look
+{
+input int PastBars = pb;  // Number of past bars to find highest bar.
+double BarLow = 0;        // Lowest bar value from PastBars range.
+
+MqlRates rates[];
+ArraySetAsSeries(rates,true);
+double copied=0;
+copied=CopyRates(Symbol(),0,0,PastBars,rates);
+   
+if(copied>0)
+  {
+    double size=fmin(copied,PastBars);
+    for(int i=0;i<size;i++)
+      {
+         If(rates[i].low < BarLow) BarLow=rates[i].low;
+      }
+  }
+return BarLow;
+}
+
+
+Box class will need the data.
+need function to put all the data in the box at once.
+void SendToDisplay()
+{
+	CV numbers
+	Triple screen info (tide, wave, ripple, force?
+	Impulse system
+	Stochastics??? oscillator maybe
+	Send the candle showing in the indicator or show none
+	Trend value with confirmed/suspect and Swingpoint info
+	swing point high
+	current price
+	swing point low
+	Bollinger bands for volitilty or use ATR?
+}
+
+Triple screen/impulse system section:
+triple screen: 3. trend. 2. dips in opposite of trend. 1. trailing buy/sell stops for entry
+for the pullbacks to prevent multiple entry, set a count to reset once force crosses 0 line.
+if force is active, then multiple stop entries could occur, limit to 1 entry while force is active.
+if 3. trend is define green/red - only use initial stop loss, if turns blue, put new stoploss
+do not engage full impulse system on a triple screen change to blue if the position is already open. 
+Set a stop when blue starts, then impulse can be used if needed.
+impulse sytstem: 3. no trend 2. trend. 1. matching color means go. either color turns to opposite and stop.
+If blue bar, set a stop at the extreme in opposite direction of trend. just in case it resumes.
+During blue on the long term trend, use the impulse system for the lower two timeframes. During red or green,
+use triple screen looking for pullbacks.
+2% maximum risk, 6% profit targets in impulse only
+No trailing stop.
+
+what if we track the amount of movement the lotunits are making
+save previousused price and lotunits and multiply them, then track the result
+PUP= 1.12809
+lotunits = 3.4 - ATR .00029 - 2% risk = 1.12867
+current price = 1.12720
+difference = 89
+total value = 89 * 3.4 = 302.6
+
+that 302.6 will be added to where ever the next value ends up
+1.12720 is the new PUP
+lotunits turns into 2.6 - ATR .00038 - 2% risk = 1.12720 + .00038 * 2 = 1.12796
+1.12480 is current
+diff = 240
+add to total = 1440
+total = 1742.6
+
+1.12290 with .00036 at 2.8 = 1672 = 3414.6 at 8.8 units
+1.11848 = 442 * 2.8 = 3889.6 + 3414.6 = 7304.2 when stacking otherwise 961
+
+Formulize this:
+PUP = 1.12809
+CUP = 1.12720
+Diff = CUP - PUP = .00089
+ATR = .00029, 2ATR = .00058, 6ATR = .00174
+Unit = 3.4
+Value = Diff * Unit = 302.6
+Stop = CUP - 2ATR
+Profit = CUP + 6ATR
+
+Total Value += value
+
+if(TideBlue)
+	if(TripleScreen)
+		if(buy order)
+			if(ProtectiveStop != Tidebar[1].low)
+				ProtectiveStop = Tidebar[1].low;
+		if(sell order)
+			if(ProtectiveStop != Tidebar[1].high)
+				ProtectiveStop = Tidebar[1].high;
+	if(ImpulseSystem)
+		if(Buy_Opened)
+			if(!WaveGreen || !RippleGreen)
+				AdjustStops();
+		if(Sell_Opened)
+			if(!WaveRed || !RippleRed)
+				AdjustStops();
+	else if(!ImpulseSystem && !TripleScreen)
+		if(WaveGreen)
+			if(RippleGreen)
+				if(OpenPosition(ORDER_TYPE_BUY))
+					ImpulseSystem = true;
+		if(WaveRed)
+			if(RippleRed)
+				if(OpenPosition(ORDER_TYPE_SELL))
+					ImpulseSystem = true;
+if(TideGreen) 
+	if(ForceBuy && !ForceActivated && !ImpulseSystem)
+		if((currentASK < (RippleEMA[0] - ATR[0])) && (currentASK < WaveEMA[0]))
+			TrailingEntry(ORDER_TYPE_BUY);
+	if(ImpulseSystem)
+		if(Buy_Opened)
+			if(!WaveGreen || !RippleGreen)
+				AdjustStops();
+	else if(!ImpulseSystem && !TripleScreen)
+		if(WaveGreen)
+			if(RippleGreen)
+				if(OpenPosition(ORDER_TYPE_BUY))
+					ImpulseSystem = true;
+
+if(TideRed)                                                            
+	if(ForceSell && !ForceActivated && !ImpulseSystem)                               
+		if((currentBID > (RippleEMA[0] + ATR[0])) && (currentBID > WaveEMA[0]))
+			TrailingEntry(ORDER_TYPE_SELL);
+	if(ImpulseSystem)
+		if(Sell_Opened)
+			if(!WaveRed || !RippleRed)
+				AdjustStops();
+	else if(!ImpulseSystem && !TripleScreen)
+		if(WaveRed)
+			if(RippleRed)
+				if(OpenPosition(ORDER_TYPE_SELL))
+					ImpulseSystem = true;
+
+//It looks like this now.   
+   if(TideBlue)
+     {
+      if(TripleScreen)
+        {
+         if(Buy_opened)
+           {
+            if(ProtectiveStop != TideBar[1].low)
+              {
+               ProtectiveStop = TideBar[1].low;
+              }
+           }
+         if(Sell_opened)
+           {
+            if(ProtectiveStop != TideBar[1].high)
+              {
+               ProtectiveStop = TideBar[1].high;   
+              }
+           }  
+        }
+      if(ImpulseSystem)
+        {
+         if(Buy_opened)
+           {
+            if(!WaveGreen || !RippleGreen)
+              {
+               AdjustStops();
+              }
+           }
+         if(Sell_opened)
+           {
+            if(!WaveRed || !RippleRed)
+              {
+               AdjustStops();
+              }
+           }  
+        }
+      else if(!ImpulseSystem && !TripleScreen)
+             {
+              if(WaveGreen)
+                {
+                 if(RippleGreen)
+                   {
+                    if(OpenPosition(ORDER_TYPE_BUY))
+                      {
+                       ImpulseSystem = true;
+                      }
+                   }
+                }
+               if(WaveRed)
+                 {
+                  if(RippleRed)
+                    {
+                     if(OpenPosition(ORDER_TYPE_SELL))
+                       {
+                        ImpulseSystem = true;
+                       }
+                    }
+                 } 
+             }    
+     }
+   if(TideGreen)
+     {
+      if(ForceBuy && !ForceActivated && !ImpulseSystem)
+        {
+         if((currentASK < (RippleEMA[0] - ATR[0])) && (currentASK < WaveEMA[0]))
+           {
+            TrailingEntry(ORDER_TYPE_BUY);
+           }
+        }
+      if(ImpulseSystem)
+        {
+         if(Buy_opened)
+           {
+            if(!WaveGreen || !RippleGreen)
+              {
+               AdjustStops();
+              }
+           }
+        }
+      else if(!ImpulseSystem && !TripleScreen)
+             {
+              if(WaveGreen)
+                {
+                 if(RippleGreen)
+                   {
+                    if(OpenPosition(ORDER_TYPE_BUY))
+                      {
+                       ImpulseSystem = true;
+                      }
+                   }
+                }
+             }
+     }
+   if(TideRed)
+     {
+      if(ForceBuy &&!ForceActivated && !ImpulseSystem)
+        {
+         if((currentBID > (RippleEMA[0] + ATR[0])) && (currentBID > WaveEMA[0]))
+           {
+            TrailingEntry(ORDER_TYPE_SELL);
+           }
+        }
+     
+      if(ImpulseSystem)
+        {
+         if(Sell_opened)
+           {
+            if(!WaveRed || !RippleRed)
+              {
+               AdjustStops();
+              }
+           }  
+        }
+      else if(!ImpulseSystem && !TripleScreen)
+             {
+               if(WaveRed)
+                 {
+                  if(RippleRed)
+                    {
+                     if(OpenPosition(ORDER_TYPE_SELL))
+                       {
+                        ImpulseSystem = true;
+                       }
+                    }
+                 } 
+             }       
+  }    
+
+
+void TrailingEntry(ENUM_ORDER_TYPE type)
+  {
+   MqlRates mrate[];
+   ArraySetAsSeries(mrate,true);
+   if(CopyRates(_Symbol,_Period,0,2,mrate) < 0)
+     {
+      Alert("Error getting the latest price quote - error:",GetLastError(),"!");
+      return;     
+     }   
+   double previousHigh = mrate[1].high;
+   double previousLow = mrate[1].low;
+   double CurrentBid = NormalizeDouble(SymbolInfoDouble(_Symbol,SYMBOL_BID),_Digits); 
+   double CurrentAsk = NormalizeDouble(SymbolInfoDouble(_Symbol,SYMBOL_ASK),_Digits);
+   if(type == ORDER_TYPE_BUY)
+     {
+      if((CurrentAsk > previousHigh) && (CurrentAsk > TideBar[1].low))
+        {
+         if(OpenPosition(type))
+            {
+            TripleScreen = true;
+            ForceActivated = true;
+            }
+        }
+     }
+   if(type == ORDER_TYPE_SELL)
+     {
+      if((CurrentBid < previousLow) && (CurrentBid < TideBar[1].high))
+        {
+         if(OpenPosition(type))
+            {
+            TripleScreen = true;
+            ForceActivated = true;
+            }
+        }
+     }  
+  }
+bool OpenPosition(ENUM_ORDER_TYPE type)
+  {
+   trade.SetExpertMagicNumber(EA_Magic);
+   trade.SetDeviationInPoints(15);
+   trade.SetTypeFilling(ORDER_FILLING_IOC);
+   trade.SetAsyncMode(false);
+   MqlTick latest_price;
+   if(!SymbolInfoTick(_Symbol,latest_price))
+     {
+      Alert("Error getting the latest price quote - error:",GetLastError(),"!");
+      return(false);      
+     }
+   if(type == ORDER_TYPE_BUY && !Sell_opened)
+     {
+      if(Buy_opened)
+        {
+         if(latest_price.ask < ((previousUsedPrice) + (2 * ATR[0]))) //Cannot trade unless 2% stop is covered
+           {
+            return(false);
+           }
+        }
+      bool results = trade.Buy(lotUnits,_Symbol,latest_price.ask,0,0,NULL);
+      uint retcode = trade.ResultRetcode();
+      if(results && (retcode == 10009 || retcode == 10008))
+        {
+         Alert("Buy order for ", _Symbol," has been placed with Ticket #: ",trade.ResultOrder());
+         previousUsedPrice = NormalizeDouble(trade.ResultPrice(),_Digits);
+         Buy_opened = true;
+         PositionThisBar = true;
+         SetStops();
+         return(true);
+        }
+      else
+        {
+	 Alert("Buy order for ", _Symbol," failed - error: ",GetLastError()," with trade error ",retcode," - ",trade.ResultRetcodeDescription(),". Price used ",latest_price.ask,". Volume used ",lotUnits);
+	 ResetLastError();
+	 return(false);
+        }  
+     }
+   if(type == ORDER_TYPE_SELL && !Buy_opened)
+     {
+      if(Sell_opened)
+        {
+         if(latest_price.bid > (previousUsedPrice - (2 * ATR[0]))) 
+           {
+            return(false);
+           }
+        }
+      bool results = trade.Sell(lotUnits,_Symbol,latest_price.bid,0,0,NULL);
+      uint retcode = trade.ResultRetcode();
+      if(results && (retcode == 10009 || retcode == 10008))
+        {
+         Alert("Sell order for ", _Symbol," has been placed with Ticket #: ",trade.ResultOrder());
+         previousUsedPrice = NormalizeDouble(trade.ResultPrice(),_Digits);
+         Sell_opened = true;
+         PositionThisBar = true;
+         SetStops();
+         return(true);
+        }
+      else
+        {
+	 Alert("Sell order for ", _Symbol," failed - error: ",GetLastError()," with trade error ",retcode," - ",trade.ResultRetcodeDescription(),". Price used: ",latest_price.bid,". Volume used: ",lotUnits);
+	 ResetLastError();
+	 return(false);
+        }  
+     }
+   else
+     {
+      return(false);
+     }       
+  }
+
+void SetStops()
+  {
+   if(Buy_opened)
+     {
+      ProtectiveStop = NormalizeDouble(previousUsedPrice - (2 * ATR[0]),_Digits);
+      ProfitExit = NormalizeDouble(previousUsedPrice + (6 * ATR[0]),_Digits);
+     }
+   if(Sell_opened)
+     {
+      ProtectiveStop = NormalizeDouble(previousUsedPrice + (2 * ATR[0]),_Digits);
+      ProfitExit = NormalizeDouble(previousUsedPrice - (6 * ATR[0]),_Digits);
+     }    
+  }
+
+void AdjustStops()
+  {
+   MqlRates mrate[];
+   ArraySetAsSeries(mrate,true);
+   if(CopyRates(_Symbol,_Period,0,2,mrate) < 0)
+     {
+      Alert("Error getting the latest price quote - error:",GetLastError(),"!");
+      return;     
+     }
+   double previousHigh = mrate[1].high;
+   double previousLow = mrate[1].low;
+   if(Buy_opened)
+     {
+      ProtectiveStop = previousLow;
+     }
+   if(Sell_opened)
+     {
+      ProtectiveStop = previousHigh;
+     }  
+  }  
+
+
+void CheckStops()
+  {
+   double CurrentBid = NormalizeDouble(SymbolInfoDouble(_Symbol,SYMBOL_BID),_Digits); 
+   double CurrentAsk = NormalizeDouble(SymbolInfoDouble(_Symbol,SYMBOL_ASK),_Digits);
+   double PriceCurrent = NormalizeDouble((CurrentAsk + CurrentBid) / 2,_Digits);
+   if(Buy_opened)
+     {
+      if(PriceCurrent < ProtectiveStop)
+        {
+         ClosePosition();
+        }
+      if(ImpulseSystem)
+        {
+         if(CurrentBid > ProfitExit)
+           {
+            ClosePosition();
+           }
+        }  
+     }
+   else if(Sell_opened)
+          {
+           if(PriceCurrent > ProtectiveStop)
+             {
+              ClosePosition();
+             }
+           if(ImpulseSystem)
+             {
+              if(CurrentAsk < ProfitExit)
+                {
+                 ClosePosition();
+                }
+             }  
+          }         
+  }
+
+void ClosePosition()
+  {
+   trade.SetAsyncMode(true);
+   trade.PositionClose(_Symbol,-1);
+   Alert("Close code: ",trade.ResultRetcode()," Protected balance is $",saveBank," Usable Balance is $",usefulBalance);
+   TripleScreen = false;
+   ImpulseSystem = false;
+   ForceActivated = false;
+   Buy_opened = false;
+   Sell_opened = false;
+  } 
+
+
+
+//Elder thermometer measures volatility
+Temperature = High current - high previous  or low previous - low current
+whichever is highest, 22 EMA on the thermometer, buy on 5-7 bar low, sell on triple ema
+
+highs = high[0] - high[1];
+lows = low[1] - low[0];
+
+if(highs > lows)
+	return highs;
+else
+	return lows;
+
+EMA for that value returned
+SMA = 
+multiplier = (2 / (TemperatureEMAperiod + 1))
+EMA[0] = (temperature - EMA[1]) X multiplier + EMA[1];
+
+ 
+	
+TRAILING STOP MAYBE
+void TrailingSL() 
+  {
+   double StopLossTemp;
+   PositionSelect(_Symbol);
+   ulong PosType = PositionGetInteger(POSITION_TYPE);
+   double PriceCurrent = PositionGetDouble(POSITION_PRICE_CURRENT);
+   double CurrentStopLoss = PositionGetDouble(POSITION_SL);
+   
+   if(PosType == POSITION_TYPE_BUY)
+      {
+      if(PriceCurrent - CurrentStopLoss > PriceCurrent - trailing_stop)
+         {
+         StopLossTemp = PriceCurrent - trailing_stop;
+         if(!trade.PositionModify(_Symbol,StopLossTemp,0)) 
+            Alert("Modify position stoploss failed with ",trade.ResultRetcode());
+         }
+      }
+   if(PosType == POSITION_TYPE_SELL)
+      {
+      if(CurrentStopLoss - PriceCurrent > trailing_stop - PriceCurrent)
+         {
+         StopLossTemp = PriceCurrent + trailing_stop;
+         if(!trade.PositionModify(_Symbol,StopLossTemp,0)) 
+            Alert("Modify position stoploss failed with ",trade.ResultRetcode());
+         }
+      }
+  }
+
+//Protect profits + drawdown minimization
+double usableBalance;
+double saveBank;  
+
+//--- Initiate the account balance size and beginning amount to protect  
+  usableBalance = NormalizeDouble(AccountInfoDouble(ACCOUNT_BALANCE),2);
+  saveBank = 0.0;                                  
+
+//in ontick to call every time and update account balance
+bool MoneyMGMT()
+  {
+//--- If profits exist, protect them, otherwise maintain bank away from balance
+   double totalBalance = NormalizeDouble(AccountInfoDouble(ACCOUNT_BALANCE),2);
+   double balDiff = totalBalance - remainingBalance - saveBank;
+   if(balDiff > 0.0) //Only protects if a profit occurs.
+     {
+      saveBank = NormalizeDouble((saveBank + (balDiff * protectPercent)),2); //protects a percentage of profits so the account never uses it
+      remainingBalance = NormalizeDouble((totalBalance - saveBank),2);     
+     }
+   else
+     {
+      remainingBalance = NormalizeDouble((totalBalance - saveBank),2);
+     }
+//Turtle management section     
+   if(remainingBalance > maxBalance)
+      maxBalance = remainingBalance;  //tracks the maximum balance reached based on where current balance is
+   
+   usefulBalance = NormalizeDouble((maxBalance - ((1/drawdownPercent) * (maxBalance - remainingBalance))),2); //Money used to trade is adjusted based on DrawdownPercent away from the maximum ever reached
+   lotUnits = NormalizeDouble(((0.01 * usefulBalance) / (ATR[0] * LotSize)),1); //Sets risk to 1% of account based on ATR 20 volatility and lot sizes   
+   lotUnits = NormalizeDouble(lotUnits / (100000 / LotSize),2); //Adjusts lot buying based on lots used ex: full lot vs mini or micro lots determined by LotSize variable
+//If run out of trading volume, stop trading here
+   if(lotUnits == 0.0)
+     {
+      if(Buy_opened || Sell_opened)
+        {
+         trade.PositionClose(_Symbol,10);
+         Alert("Out of usable Balance. Protected balance is $",saveBank," Usable trading balance is $",usefulBalance,". Waiting 22 minutes to reset.");
+         Sleep(1320000);
+         usefulBalance = remainingBalance;
+         return(false);
+        }
+      return(false);
+     }
+   return(true);
+  }
+
+//put logic right after previousUsedprice is set
+ProtectiveStop = previousUsedPrice - (2 * N_Value[0]);   //stops at 2ATR below the opening price
+if(PositionGetDouble(POSITION_PRICE_CURRENT) < ProtectiveStop)
+	{
+	trade.PositionClose(_Symbol,10);
+	Alert("The posistion close code is: ",trade.ResultRetcode()," Protected balance is $",saveBank," Usable Balance is $",usableBalance);
+	}
+
+
+
+Compare new function for lastbuy and sell tickets to old way of getting previous ticket numbers, there is an error
+in the new way, not pulling correct prices.
+
+OR OR OR
+
+make a global variable that is updated each time an order is place
+globalpricevariable = result.price, in the same time the order is accepted.
+each program would track its own variable for price for setting next prices.
+delete and check pending orders would still verify the symbol before delete or checking
+
+double previousUsedPrice;  //sets global variable to track the last price used when ordering
+
+//in the functions to buy, after order is placed and confirmation is received
+previousUsedPrice = NormalizeDouble(result.price,2);
+//should replace the checks below and the lastBuyTicket/lastSellTicket functions
+
+         if(Buy_opened)
+           {      
+           datetime enddate = TimeCurrent();
+           datetime startdate = enddate - PeriodSeconds(PERIOD_H6);
+           HistorySelect(startdate,enddate);                    
+           int lastOrder = HistoryDealsTotal() - 1;
+		     ulong lastTicket = HistoryDealGetTicket(lastOrder);
+		     if(HistoryOrderSelect(lastTicket) == ORDER_TYPE_BUY)
+		        {
+		        if(!checkPendingOrders())
+		         {
+			      double lastPrice = HistoryDealGetDouble(lastTicket,DEAL_PRICE);
+			      addPipsToPrevious(lotUnits,EA_Magic,lastPrice);
+			      return;
+			      }
+			     }
+           }         
+
+           if(Sell_opened)
+           {      
+           datetime enddate = TimeCurrent();
+           datetime startdate = enddate - PeriodSeconds(PERIOD_D1);
+           HistorySelect(startdate,enddate);                    
+           int lastOrder = HistoryDealsTotal() - 1;
+		     ulong lastTicket = HistoryDealGetTicket(lastOrder);
+		     if(HistoryOrderSelect(lastTicket) == ORDER_TYPE_SELL)
+		        {
+		        if(!checkPendingOrders())
+		         {
+			      double lastPrice = HistoryDealGetDouble(lastTicket,DEAL_PRICE);
+			      subtractPipsFromPrevious(lotUnits,EA_Magic,lastPrice);
+			      return;
+			      }
+			     }
+           }
+
+ulong lastSellTicket()
+  {
+  datetime enddate = TimeCurrent();
+  datetime startdate = enddate - PeriodSeconds(PERIOD_D1);
+  HistorySelect(startdate,enddate);                    
+  int lastOrder = HistoryDealsTotal() - 1;
+  for (int i = lastOrder; i >=0; i--)
+      {   
+		ulong ticket = HistoryDealGetTicket(i);
+		HistoryOrderSelect(ticket);
+		if (((HistoryOrderSelect(ticket) == ORDER_TYPE_SELL)) && (HistoryOrderGetString(ticket,ORDER_SYMBOL) == _Symbol))
+		   return(ticket);
+		}
+  return(0);	
+  }
+ulong lastBuyTicket()
+  {
+  datetime enddate = TimeCurrent();
+  datetime startdate = enddate - PeriodSeconds(PERIOD_D1);
+  HistorySelect(startdate,enddate);                    
+  int lastOrder = HistoryDealsTotal() - 1;
+  for (int i = lastOrder; i >=0; i--)
+      {   
+		ulong ticket = HistoryDealGetTicket(i);
+		HistoryOrderSelect(ticket);
+		if ((HistoryOrderSelect(ticket) == ORDER_TYPE_BUY) && (HistoryOrderGetString(ticket, ORDER_SYMBOL) == _Symbol))
+		   return(ticket);
+		}
+  return(0);	
+  }
+
+
+
+
+if(!checkPendingOrders())
+	{
+	ulong lastTicket = lastSellTicket();
+	double lastPrice = HistoryDealGetDouble(lastTicket,DEAL_PRICE);
+	subtractPipsFromPrevious(lotUnits,EA_Magic,lastPrice);
+	return;
+	}
+
+
+bool checkPendingOrders()
+  {
+	int total = OrdersTotal() - 1;
+	for(int i=total; i>=0; i--)
+	   {
+	   ulong ticket = OrderGetTicket(i);
+	   if(OrderSelect(ticket) && (OrderGetInteger(ORDER_STATE) == ORDER_STATE_PLACED) && (OrderGetString(ORDER_SYMBOL) == _Symbol))
+	      {
+               return(true);
+	      }
+		   
+	   }
+	   return(false);
+  }
+			
+
+
+
+
+double lotUnits = NormalizeDouble(AccountInfoDouble(ACCOUNT_BALANCE) * 0.02 / (Lot*1000),1);
+
+
+void deletePendingOrders()
+  {
+	int total = OrdersTotal() - 1;
+	for(int i=total; i>=0; i--)
+	   {
+		int ticket = OrderGetTicket(i);
+		if(OrderSelect(ticket) != (ORDER_TYPE_BUY || ORDER_TYPE_SELL))
+		  {
+			trade.OrderDelete(i);
+			Alert("Order deleted with: ",trade.ResultRetcode());
+		  }
+	   }
+  }
+
+
+
+void deletePendingOrders()
+   {
+   MqlTradeRequest req = {0};
+   MqlTradeResult  res = {0};
+
+   int orders = OrdersTotal();
+   req.action = TRADE_ACTION_REMOVE;
+
+   for(int i = orders - 1; i >= 0 ;i--)
+     {
+     req.order  = OrderGetTicket (i);
+      if (OrderGetString(ORDER_SYMBOL) == _Symbol)
+        {
+        ResetLastError();
+        if(!OrderSend(req,res))
+          {
+           Print("Fail to delete ticket ",req.order  ,": Error ",GetLastError(),", retcode = ",res.retcode);
+          }
+        }
+     }
+   }
+
+
+
+	
+		
+void addPipsToPrevious(double lot, int magic, double price)
+  {
+//--- Set OrderSend parameters  
+	MqlTradeRequest request;
+	MqlTradeResult result;
+	MqlTick latest_price;
+//--- Get the last price quote using the MQL MqlTick Structure
+   if(!SymbolInfoTick(_Symbol,latest_price))
+     {
+      Alert("Error getting the latest price quote - error:",GetLastError(),"!");
+      return;
+     }
+//--- Setup and place the initial market buy order
+   request.action = TRADE_ACTION_PENDING;                         //immediate order execution
+	request.price = NormalizeDouble(price + 0.00100,_Digits);  //latest ask price
+	request.sl = 0;  											            //Stop loss turned off
+	request.tp = 0;  											            //Take profit turned off
+	request.symbol = _Symbol;                                   //currency pair
+	request.volume = lot;                                       //number of lots to trade
+	request.magic = magic;                                      //Order magic number
+	request.type = ORDER_TYPE_BUY_STOP;                         //Buy Order
+	request.type_filling = ORDER_FILLING_IOC;                   //Order execution type
+	request.deviation = 10;                                     //Deviation from current price
+//--- Send order and check for errors
+	bool res = OrderSend(request,result);
+	if(res && (result.retcode == 10009 || result.retcode == 10008))  //Request is completed or order placed
+	   {
+	    Alert("A Buy order has been successfully placed with Ticket #:", result.order,"!");
+	   }
+   else
+	   {
+	   Alert("The Buy order request could not be completed - error:",GetLastError());
+	   ResetLastError();
+	   return;
+	   }
+  }
+
+
+//Add ability to place both types of orders with one function, possibly with addPipsToPrvious function also
+
+
+//trade class can make buying even faster. trade.SetTypeFilling(ORDER_FILLING_IOC); and trade.Buy(...) fill
+//the same role as these complex buy orders.
+
+void initialBuyPlacement(double lot, int magic)
+  {
+//--- End open positions
+   trade.PositionClose(_Symbol,10);
+   Alert("The posistion close code is: ",trade.ResultRetcode());   
+//--- Set OrderSend parameters  
+	MqlTradeRequest request;
+	MqlTradeResult result;
+	MqlTick latest_price;
+//--- Get the last price quote using the MQL MqlTick Structure
+   if(!SymbolInfoTick(_Symbol,latest_price))
+     {
+      Alert("Error getting the latest price quote - error:",GetLastError(),"!");
+      return;
+     }
+//--- Setup and place the initial market buy order
+   request.action = TRADE_ACTION_DEAL;                         //immediate order execution
+	request.price = NormalizeDouble(latest_price.ask,_Digits);  //latest ask price
+	request.sl = 0;  											            //Stop loss turned off
+	request.tp = 0;  											            //Take profit turned off
+	request.symbol = _Symbol;                                   //currency pair
+	request.volume = lot;                                       //number of lots to trade
+	request.magic = magic;                                      //Order magic number
+	request.type = ORDER_TYPE_BUY;                              //Buy Order
+	request.type_filling = ORDER_FILLING_IOC;                   //Order execution type
+	request.deviation = 10;                                     //Deviation from current price
+//--- Send order and check for errors
+	bool res = OrderSend(request,result);
+	if(res && (result.retcode == 10009 || result.retcode == 10008))  //Request is completed or order placed
+	   {
+	    Alert("A Buy order has been successfully placed with Ticket #:", result.order,"!");
+	   }
+   else
+	   {
+	   Alert("The Buy order request could not be completed - error:",GetLastError());
+	   ResetLastError();
+	   return;
+	   }
+  }
+
+void TrailingSL() 
+  {
+   double StopLossTemp;
+   
+   for(int i = 0; i < PositionsTotal(); i++)
+   {      
+      if(Symbol()==PositionGetSymbol(i))
+      {
+         if(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY)
+         {
+            if(PositionGetDouble(POSITION_PRICE_CURRENT) > PositionGetDouble(POSITION_PRICE_OPEN)) 
+            {               
+               StopLossTemp = PositionGetDouble(POSITION_PRICE_CURRENT) - trailing_stop;
+               ChangePosition(StopLossTemp);
+            }
+         }
+   
+         if(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_SELL)
+         {
+            if(PositionGetDouble(POSITION_PRICE_CURRENT) < PositionGetDouble(POSITION_PRICE_OPEN)) 
+            {
+               StopLossTemp = PositionGetDouble(POSITION_PRICE_CURRENT) + trailing_stop;
+               ChangePosition(StopLossTemp);
+            }
+         }
+      }
+   }
+  }
+
+void ChangePosition(double StopLossTemp) 
+  {
+//--- Clear mrequest parameter
+	ZeroMemory(mrequest);
+	
+   mrequest.action = TRADE_ACTION_SLTP;
+   mrequest.symbol = Symbol();
+   mrequest.sl = NormalizeDouble(StopLossTemp,Digits());
+   
+   if(!OrderSend(mrequest,mresult))
+      Alert("Trailing stop failed with ",GetLastError());
+  }

@@ -1,0 +1,83 @@
+
+/*
+
+Oldest arrows do not delete unless timeframe is changed
+next order will turn off if timeframe changed, not sure if this should default on or off
+
+CV incomplete
+straddle complete
+
+trailing complete
+
+
+
+
+3 rows
+Buttons need rows also, what buttons are needed?
+Buy  -complete 
+Sell
+next order - complete
+Straddle - set the next order section on also
+		complete
+
+Trailing stop - Activates trailing stop, using previous bar low for buys, or previous high for sells
+				Would a % rule work better?
+Close All - complete
+
+
+Buy		Next Order on/off	Straddle High Field
+Sell	Straddle			Straddle Low field
+Trailing Stop on/off		Close Position
+
+*/
+
+
+
+//Labels:             //Controls/edit fields/checkboxes
+CV:           # / #      //show number for up and down directions, green on buys of 4+, red for sells
+
+T/W/R:       complete
+
+TS Force:     complete
+
+Impulse:     complete
+
+
+Trend:   complete
+
+Resistance:   complete
+
+Price: complete
+
+Support:   complete
+
+R/R:	 complete
+
+//Volatilty - Bollinger bands: Location(above/below center, above upper, below lower), Raising, Lowering (above or below previous bar) Narrow/wide //how the hell will this be judged
+
+//MISC items
+Volume: //pocket pivots?
+
+NR7 days bruh
+//find high and low of a bar and subtract them, save as double bRange
+//track the bRange over time, each bar that has a smaller bRange increment NR variable by 1.
+//NRvar would have to be global to run each new bar
+
+//maybe even stochastic pop scans
+
+
+//How to count CV??
+momentum: 1 for up, 0 for sideways, -1 for down //Tide bar for momentum
+Oscillator: 1 for up, 0 for sideways, -1 for down //Force index pop
+trend(line): Confirmed/suspect should not affect, up = 1, down -1, sideways = 0 
+S/R level: depending on trend, if up, and within 1/3 of distance to support in relation to next resistance
+
+//fuck theses bottom ones, they might just need check boxes and visual inspection
+Fib levels: 23.6, 38.2, 50, 61.8, 76.4: check if hits one
+Candle: Bullish = 1, Bearish = -1, n/a = 0
+
+
+
+Trend complete
+
+	
